@@ -59,20 +59,26 @@ class TPCHQuerySuite extends KyuubiFunSuite {
         in.close()
         queryName -> queryContent
       }.foreach { case (name, sql) =>
+        var schemaDDL: String = null
+        var sumHashResult: String = null
+        var tuple: (String, String) = (null, null)
         try {
           val result = spark.sql(sql).collect()
+          // scalastyle:off println
+          println(s"query $name result: ${result.toList}")
+          // scalastyle:on println
           val schema = spark.sql(sql).schema
-          val schemaDDL = LICENSE_HEADER + schema.toDDL + "\n"
+          schemaDDL = LICENSE_HEADER + schema.toDDL + "\n"
           spark.createDataFrame(result.toList.asJava, schema).createTempView(s"$name$viewSuffix")
-          val sumHashResult = LICENSE_HEADER + spark.sql(
+          sumHashResult = LICENSE_HEADER + spark.sql(
             s"select sum(hash(*)) from $name$viewSuffix").collect().head.get(0) + "\n"
-          val tuple = generateGoldenFiles("kyuubi/tpch", name, schemaDDL, sumHashResult)
-          assert(schemaDDL == tuple._1)
-          assert(sumHashResult == tuple._2)
+          tuple = generateGoldenFiles("kyuubi/tpch", name, schemaDDL, sumHashResult)
         } catch {
           case cause: Throwable =>
             fail(name, cause)
         }
+        assert(schemaDDL == tuple._1)
+        assert(sumHashResult == tuple._2)
       }
     }
   }
